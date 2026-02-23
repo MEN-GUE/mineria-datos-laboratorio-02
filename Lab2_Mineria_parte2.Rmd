@@ -1,0 +1,199 @@
+---
+
+title: "Lab2_parte2"
+author: "Alejandro Anton"
+date: "2026-02-23"
+output: html_document
+---------------------
+
+
+# 1. Introducción
+
+En esta sección se obtienen **reglas de asociación** utilizando el algoritmo **Apriori** sobre el conjunto de datos `movies_2026.csv`.
+
+Se realiza:
+
+* Discretización de variables numéricas.
+* Generación de reglas con diferentes niveles de soporte y confianza.
+* Evaluación del lift.
+* Eliminación de variables muy frecuentes para obtener mejores insights.
+
+---
+
+# 2. Carga de Datos
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(arules)
+library(arulesViz)
+```
+
+```{r}
+movies <- read.csv("C:/Users/aleja/Downloads//data.csv", encoding = "latin1")
+str(movies)
+summary(movies)
+```
+
+---
+
+# 3. Selección de Variables
+
+Seleccionamos las variables relevantes para minería de reglas:
+
+* genres
+* originalLanguage
+* budget
+* revenue
+* runtime
+* popularity
+* voteAvg
+* voteCount
+
+```{r}
+movies2 <- movies %>%
+  select(genres, originalLanguage, budget, revenue, runtime,
+         popularity, voteAvg, voteCount) %>%
+  drop_na(genres)
+```
+
+---
+
+# 4. Discretización de Variables Numéricas
+
+El algoritmo Apriori requiere variables categóricas. Se discretizan las variables numéricas usando cuantiles (3 categorías).
+
+```{r}
+movies2 <- movies2 %>%
+  mutate(
+    budget_cat = discretize(budget, method = "frequency", categories = 3),
+    revenue_cat = discretize(revenue, method = "frequency", categories = 3),
+    runtime_cat = discretize(runtime, method = "frequency", categories = 3),
+    popularity_cat = discretize(popularity, method = "frequency", categories = 3),
+    voteAvg_cat = discretize(voteAvg, method = "frequency", categories = 3),
+    voteCount_cat = discretize(voteCount, method = "frequency", categories = 3)
+  )
+
+movies2 <- movies2 %>%
+  select(genres, originalLanguage,
+         budget_cat, revenue_cat, runtime_cat,
+         popularity_cat, voteAvg_cat, voteCount_cat)
+```
+
+---
+
+# 5. Conversión a Formato Transaccional
+
+```{r}
+movies_trans <- as(movies2, "transactions")
+summary(movies_trans)
+```
+
+---
+
+# 6. Generación de Reglas
+
+## 6.1 Soporte = 0.05 | Confianza = 0.6
+
+```{r}
+rules1 <- apriori(movies_trans,
+                  parameter = list(supp = 0.05,
+                                   conf = 0.6,
+                                   minlen = 2))
+
+inspect(sort(rules1, by = "lift")[1:10])
+```
+
+### Discusión
+
+Con soporte alto se generan pocas reglas y suelen estar dominadas por categorías frecuentes.
+
+---
+
+## 6.2 Soporte = 0.03 | Confianza = 0.7
+
+```{r}
+rules2 <- apriori(movies_trans,
+                  parameter = list(supp = 0.03,
+                                   conf = 0.7,
+                                   minlen = 2))
+
+inspect(sort(rules2, by = "lift")[1:10])
+```
+
+### Discusión
+
+Se obtiene un mejor equilibrio entre cantidad y calidad de reglas.
+
+---
+
+## 6.3 Soporte = 0.01 | Confianza = 0.8
+
+```{r}
+rules3 <- apriori(movies_trans,
+                  parameter = list(supp = 0.01,
+                                   conf = 0.8,
+                                   minlen = 2))
+
+inspect(sort(rules3, by = "lift")[1:10])
+```
+
+### Discusión
+
+Se generan muchas reglas. Aunque la confianza es alta, algunas pueden tener bajo soporte práctico.
+
+---
+
+# 7. Identificación de Ítems Muy Frecuentes
+
+```{r}
+itemFrequencyPlot(movies_trans, topN = 20, type = "absolute")
+```
+
+Es probable que el idioma inglés ("en") y categorías de bajo presupuesto o bajo revenue dominen las reglas.
+
+---
+
+# 8. Eliminación de Variable Muy Frecuente
+
+Se elimina el idioma inglés para evaluar si emergen reglas más interesantes.
+
+```{r}
+movies3 <- movies2 %>%
+  filter(originalLanguage != "en")
+
+movies_trans2 <- as(movies3, "transactions")
+
+rules_filtered <- apriori(movies_trans2,
+                          parameter = list(supp = 0.02,
+                                           conf = 0.7,
+                                           minlen = 2))
+
+inspect(sort(rules_filtered, by = "lift")[1:10])
+```
+
+### Discusión
+
+Al eliminar una variable dominante:
+
+* Se reduce el sesgo en las reglas.
+* Aparecen asociaciones más específicas.
+* Se obtienen mejores insights entre género, presupuesto, popularidad y votaciones.
+
+---
+
+# 9. Conclusiones
+
+* La discretización es esencial para aplicar Apriori.
+* El soporte controla la frecuencia mínima.
+* La confianza mide la fuerza predictiva.
+* El lift permite identificar asociaciones no triviales.
+* Eliminar variables muy frecuentes mejora la calidad de los resultados.
+* Un equilibrio adecuado (supp ≈ 0.02–0.03 y conf ≈ 0.7) genera reglas interpretables.
+
+---
+
+# 10. Visualización de Reglas
+
+```{r}
+plot(rules_filtered, method = "graph", engine = "htmlwidget")
+```
