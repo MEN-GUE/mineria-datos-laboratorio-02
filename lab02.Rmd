@@ -1,6 +1,8 @@
 ---
 title: "lab02"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 date: "2026-02-23"
 ---
 
@@ -51,7 +53,7 @@ Se realiza:
 ---
 
 # 2. Carga de Datos
-```{r setup, message=FALSE, warning=FALSE}
+```{r}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(arules)
@@ -59,7 +61,7 @@ library(arulesViz)
 ```
 
 ```{r}
-movies <- read.csv("C:/Users/aleja/Downloads//data.csv", encoding = "latin1")
+movies <- read.csv("movies_2026.csv", encoding = "latin1")
 str(movies)
 summary(movies)
 ```
