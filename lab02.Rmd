@@ -854,3 +854,20 @@ print(grafica_umap)
 ```
 # 4.2
 El mapa visual generado por el algoritmo UMAP confirma claramente que los cuatro grupos de películas descubiertos antes están bien separados en la realidad. Se observa un núcleo principal que agrupa al cine comercial exitoso, el cual está muy alejado de las producciones amateur o cortometrajes que aparecen dispersos por su gran variedad de formatos. Por otro lado, las películas épicas y el cine independiente de nicho forman sus propias islas totalmente aisladas del resto. Para CineVision Studios, este gráfico funciona como un radar de riesgo muy útil para predecir de forma visual a qué modelo de negocio pertenecerá cualquier nuevo proyecto.
+
+# 5.1
+## Hallazgos, Conclusiones y Sugerencias
+Agrupamiento (Clustering): El mercado no es uniforme, sino que se divide en cuatro perfiles claros. Se identificó un sólido núcleo de Cine Comercial Exitoso (duración estándar y alta rentabilidad) y una élite de Producciones Épicas (elencos masivos y duraciones extensas que logran la mejor aclamación del público). En contraste, existe una inmensa cantidad de proyectos amateur o de cortometrajes con impacto nulo, y un pequeño nicho de cine independiente de bajo presupuesto.
+
+Reducción de Dimensionalidad (PCA): Se demostró que las 12 variables originales pueden resumirse eficientemente en 3 componentes principales que explican más del 63% de la variabilidad. Estos ejes representan: 1) La escala global de la película, 2) El balance entre arte/prestigio y éxito taquillero, y 3) La estructura de producción multinacional.
+
+Reglas de Asociación (Apriori): El análisis reveló que la discretización cuidadosa y la eliminación de variables omnipresentes (como el idioma original en inglés) son pasos obligatorios. Al retirar el ruido estadístico, emergieron patrones de asociación muy fuertes entre rangos de presupuesto, volumen de votos y niveles de popularidad.
+
+Mapeo Topológico (UMAP): Validó visualmente las matemáticas del clustering. Demostró que las películas de nicho y las súper-producciones forman "islas" completamente separadas del núcleo comercial, confirmando que operan bajo modelos de negocio estadísticamente distintos.
+
+## Sugerencias para CineVision Studios:
+Con base en los patrones descubiertos, se proponen las siguientes acciones clave para el estudio:
+* Apostar por el cine comercial estándar: Dirigir la mayor parte de la inversión a películas de formato tradicional (alrededor de 100 minutos y presupuesto moderado), ya que demostraron ser la opción más segura, popular y rentable.
+* Invertir selectivamente en prestigio: Producir solo uno o dos proyectos épicos al año (de gran elenco y larga duración). Aunque son difíciles de hacer, aseguran las calificaciones más altas del público y dan prestigio al estudio.
+* Usar el mapa visual como filtro de riesgo: Antes de aprobar y financiar un nuevo proyecto, se debe comparar con el mapa generado para predecir rápidamente si será un éxito comercial o si corre el riesgo de generar pérdidas.
+* ambiar la distribución del cine independiente: Las películas de muy bajo presupuesto y de nicho no deben gastar dinero en publicidad masiva para cines. Su estrategia debe ser ir directamente a festivales especializados o plataformas de streaming.
