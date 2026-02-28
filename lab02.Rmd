@@ -1,8 +1,8 @@
 ---
 title: "lab02"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 date: "2026-02-23"
 ---
 
@@ -37,6 +37,161 @@ movies_scaled <- as.data.frame(scale(movies_cluster))
 summary(movies_scaled)
 head(movies_scaled)
 ```
+
+# 1.2
+```{r hopkins-vat}
+library(factoextra)
+library(dplyr)
+
+movies_sample <- movies_scaled %>% sample_n(1500)
+tendencia <- get_clust_tendency(movies_sample, n = 50, graph = TRUE)
+
+# --- RESULTADOS
+
+# Hopkins
+cat("Estadístico de Hopkins:", tendencia$hopkins_stat, "\n")
+
+# VAT
+print(tendencia$plot)
+```
+Podemos observar un valor estadístico de hopkins de 0.942, muy cercano 1, lo que indica cierta practicidad en realizar agrupaciones de datos, la prueba VAT también arroja cómo gráficamente los datos parecen mostrar ciertas tenedencias, detectamos al menos 4 grupos posibles separados, por lo que se puede proceder al clustering.
+
+# 1.3
+```{r metodos de evaluacion de agrupamiento futuro}
+library(factoextra)
+library(NbClust)
+library(dplyr)
+library(ggplot2)
+
+set.seed(666)
+movies_sample_opt <- movies_scaled %>% sample_n(1500)
+
+# Metodo del codo
+cat("Generando gráfica del Método del Codo...\n")
+grafica_codo <- fviz_nbclust(movies_sample_opt, kmeans, method = "wss") +
+  labs(title = "Método del Codo para determinar K óptimo",
+       x = "Número de clústeres (k)", 
+       y = "Suma de Cuadrados Intra-clúster (WSS)")
+
+print(grafica_codo)
+
+# Metodo nbclust
+# Usamos invisible() y capture.output() para evitar que NbClust imprima demasiado texto en el PDF
+cat("Ejecutando NbClust para evaluar 30 índices...\n")
+invisible(capture.output(
+  resultados_nbclust <- NbClust(data = movies_sample_opt, 
+                                distance = "euclidean", 
+                                min.nc = 2, max.nc = 10, 
+                                method = "kmeans", 
+                                index = "all")
+))
+
+# === FIX PARA EL ERROR DE FACTOEXTRA ===
+# Extraemos la votación mayoritaria manualmente de NbClust
+votos <- as.data.frame(table(resultados_nbclust$Best.nc[1, ]))
+colnames(votos) <- c("Clusters", "Frecuencia")
+
+# Graficamos con ggplot2
+grafica_votos <- ggplot(votos, aes(x = Clusters, y = Frecuencia)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Número Óptimo de Clústeres - Votación Mayoritaria (NbClust)",
+       x = "Número de clústeres (k) propuesto",
+       y = "Frecuencia (Cantidad de índices)") +
+  theme(plot.title = element_text(face = "bold"))
+
+print(grafica_votos)
+```
+Las pruebas realizada con la ayuda de la libreria NbClust dan un por la regla de la mayoría una recomendación de agrupamiento mediante 4 clusters. Esto es apoyado por el método del codo, dónde gráficamente observamos un punto de inflección muy claro entre 3 y 4, debido a las pruebas de Nbcluts decidimos irnos por un total de 4 grupos.
+
+# 1.4
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(factoextra)
+
+set.seed(666)
+indices_muestra <- sample(1:nrow(movies_cluster), 2000)
+
+# Filtramos
+movies_sample_cluster <- movies_cluster[indices_muestra, ]
+movies_sample_scaled <- as.data.frame(scale(movies_sample_cluster))
+
+# k-medias
+km_res <- kmeans(movies_sample_scaled, centers = 4, nstart = 25)
+
+movies_sample_cluster$Cluster_KMeans <- as.factor(km_res$cluster)
+
+# jerarquico
+cat("Calculando matriz de distancias para 2000 registros...\n")
+distancias <- dist(movies_sample_scaled, method = "euclidean")
+
+cat("Generando árbol jerárquico...\n")
+hc_res <- hclust(distancias, method = "ward.D2")
+
+grupos_hc <- cutree(hc_res, k = 4)
+movies_sample_cluster$Cluster_HC <- as.factor(grupos_hc)
+
+# comparacion
+cat("\nMatriz de Confusión (K-Medias vs Jerárquico):\n")
+tabla_comparacion <- table(K_Medias = movies_sample_cluster$Cluster_KMeans, 
+                           Jerarquico = movies_sample_cluster$Cluster_HC)
+print(tabla_comparacion)
+
+# pca
+grafico_pca <- fviz_cluster(km_res, data = movies_sample_scaled, 
+                            geom = "point", 
+                            ellipse.type = "convex", 
+                            ggtheme = theme_minimal(),
+                            main = "Agrupamiento K-Medias (Muestra 2000 obs)")
+print(grafico_pca)
+
+# grafico radar (mi favorito)
+centroides_escalados <- movies_sample_scaled %>%
+  mutate(Cluster = as.factor(km_res$cluster)) %>%
+  group_by(Cluster) %>%
+  summarise_all(mean)
+
+centroides_largo <- centroides_escalados %>%
+  pivot_longer(cols = -Cluster, names_to = "Variable", values_to = "Media_Escalada")
+
+grafico_radar <- ggplot(centroides_largo, aes(x = Variable, y = Media_Escalada, color = Cluster, group = Cluster)) +
+  geom_polygon(fill = NA, linewidth = 1) + 
+  geom_point(size = 2) +
+  geom_line(linewidth = 0.5, linetype = "dashed") +
+  coord_polar() + 
+  theme_minimal() +
+  labs(title = "Perfil de los 4 Clusters (K-Medias en Muestra)",
+       subtitle = "Valores estandarizados: 0 es el promedio de la variable",
+       y = "Media Estandarizada") +
+  theme(axis.text.x = element_text(angle = 0, size = 10, face = "bold"),
+        legend.position = "right")
+
+print(grafico_radar)
+```
+Podemos observar que ambos métodos de agrupamiento, tanto k-medias como jerárquico, muestran una tendencia similar en la asignación de registros a los clusters, aunque no son idénticos. La matriz de confusión revela que hay cierta superposición entre los grupos formados por ambos métodos, lo que sugiere que aunque no coinciden perfectamente, sí capturan patrones similares en los datos. El gráfico PCA muestra una clara separación entre los clusters formados por k-medias, mientras que el gráfico de radar  para este caso no es lo más eficiente para representar visualmente lo que están experimentando los datos.
+
+# 1.5
+```{r}
+library(cluster)
+library(factoextra)
+
+cat("Calculando el coeficiente de silueta para K-Medias...\n")
+
+# silueta
+sil_kmeans <- silhouette(km_res$cluster, dist(movies_sample_scaled))
+summary(sil_kmeans)
+grafica_silueta <- fviz_silhouette(sil_kmeans, 
+                                   palette = "jco", 
+                                   ggtheme = theme_minimal(),
+                                   main = "Gráfico de Silueta - Calidad de K-Medias (K=4)")
+
+print(grafica_silueta)
+```
+El análisis de silueta nos permitió evaluar de manera visual qué tan bien integradas están las películas dentro de sus respectivos grupos. El resultado mostró un promedio general positivo, lo que confirma que la mayoría de las películas comparten características fuertes con su propio segmento y se diferencian adecuadamente de los demás. Aunque se observaron algunas películas con valores negativos, esto es completamente normal en esta industria, ya que representan producciones "fronterizas" que mezclan presupuestos o atributos de distintos grupos. En conclusión, esta métrica nos asegura que la segmentación en cuatro grupos es lo suficientemente sólida y confiable para basar en ella futuras decisiones comerciales.
+
+
 
 # Parte 2
 # 1. Introducción
