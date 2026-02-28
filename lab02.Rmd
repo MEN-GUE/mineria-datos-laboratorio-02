@@ -86,12 +86,11 @@ invisible(capture.output(
                                 index = "all")
 ))
 
-# === FIX PARA EL ERROR DE FACTOEXTRA ===
-# Extraemos la votación mayoritaria manualmente de NbClust
+
 votos <- as.data.frame(table(resultados_nbclust$Best.nc[1, ]))
 colnames(votos) <- c("Clusters", "Frecuencia")
 
-# Graficamos con ggplot2
+# Grafica
 grafica_votos <- ggplot(votos, aes(x = Clusters, y = Frecuencia)) +
   geom_bar(stat = "identity", fill = "steelblue", color = "black") +
   theme_minimal() +
@@ -191,7 +190,35 @@ print(grafica_silueta)
 ```
 El análisis de silueta nos permitió evaluar de manera visual qué tan bien integradas están las películas dentro de sus respectivos grupos. El resultado mostró un promedio general positivo, lo que confirma que la mayoría de las películas comparten características fuertes con su propio segmento y se diferencian adecuadamente de los demás. Aunque se observaron algunas películas con valores negativos, esto es completamente normal en esta industria, ya que representan producciones "fronterizas" que mezclan presupuestos o atributos de distintos grupos. En conclusión, esta métrica nos asegura que la segmentación en cuatro grupos es lo suficientemente sólida y confiable para basar en ella futuras decisiones comerciales.
 
+# 1.6
+```{r}
+library(dplyr)
+library(knitr)
 
+# Calculamos el promedio de las variables originales (sin estandarizar) para cada cluster
+# Esto nos permite interpretar los grupos con valores reales (dólares, minutos, cantidad de actores, etc.)
+perfil_clusters <- movies_sample_cluster %>%
+  group_by(Cluster_KMeans) %>%
+  summarise(
+    Cantidad_Peliculas = n(),
+    Presupuesto_Promedio = mean(budget, na.rm = TRUE),
+    Ingresos_Promedio = mean(revenue, na.rm = TRUE),
+    Duracion_Promedio = mean(runtime, na.rm = TRUE),
+    Popularidad_Promedio = mean(popularity, na.rm = TRUE),
+    Calificacion_Promedio = mean(voteAvg, na.rm = TRUE),
+    Elenco_Promedio = mean(actorsAmount, na.rm = TRUE)
+  )
+
+# Mostramos la tabla formateada
+kable(perfil_clusters, format = "markdown", digits = 2, 
+      caption = "Perfilamiento de los 4 Clusters (Valores Promedio Originales)")
+```
+nterpretación comercial de los grupos:
+
+* Grupo 4 (Cine Comercial Exitoso): Es el estándar rentable de la industria; películas populares, de duración normal y buenos ingresos.
+* Grupo 2 (Épicas Aclamadas): Producciones muy largas y con elencos gigantes, que logran las mejores calificaciones del público.
+* Grupo 1 (Cortometrajes o Amateur): Proyectos de muy corta duración, con presupuestos, elencos y ganancias prácticamente nulos.
+* Grupo 3 (Cine Independiente): Películas de duración tradicional pero con presupuesto mínimo; generan poco dinero pero atraen a nichos específicos.
 
 # Parte 2
 # 1. Introducción
@@ -785,4 +812,45 @@ varianza
     -   **Limpieza de datos:** Antes de aplicar modelos avanzados, se recomienda revisar la variable `castMenAmount` y `productionCountriesAmount` para corregir posibles errores de registro.
 
 
+# 4.1
+## Justificación de la Selección: UMAP
+Para esta última fase de la consultoría, se evaluaron las cuatro opciones propuestas (SVD, t-SNE, UMAP, ICA). Se descartó SVD por ser el motor matemático subyacente del PCA (ya realizado, resultaría redundante) e ICA porque las variables cinematográficas (presupuesto, ingresos, popularidad) están altamente entrelazadas y no provienen de "fuentes independientes" puras.
 
+Entre t-SNE y UMAP, se seleccionó UMAP. A diferencia del PCA, que es lineal y puede superponer grupos en su proyección 2D, UMAP es un algoritmo de reducción de dimensionalidad no lineal excelente para separar visualmente "islas" de datos complejos. Se prefirió por encima de t-SNE debido a su superior eficiencia computacional y menor consumo de memoria RAM, lo cual es vital dada la alta carga de procesamiento que exige este volumen de datos. Esta técnica permitirá a CineVision Studios tener un mapa visual topológico claro para validar si los 4 perfiles comerciales descubiertos en el clustering realmente forman agrupaciones separadas y naturales.
+
+```{r umap}
+library(umap)
+library(ggplot2)
+library(dplyr)
+
+cat("Ejecutando algoritmo UMAP...\n")
+
+# Configuración de UMAP
+umap_config <- umap.defaults
+umap_config$random_state <- 666 
+
+umap_res <- umap(movies_sample_scaled, config = umap_config)
+
+# dataframe combinando las coordenadas UMAP y los Clústeres de K-Medias
+umap_data <- data.frame(
+  UMAP1 = umap_res$layout[, 1],
+  UMAP2 = umap_res$layout[, 2],
+  Cluster_KMeans = movies_sample_cluster$Cluster_KMeans
+)
+
+# grafico de dispersión no lineal
+grafica_umap <- ggplot(umap_data, aes(x = UMAP1, y = UMAP2, color = Cluster_KMeans)) +
+  geom_point(alpha = 0.7, size = 2.5) +
+  theme_minimal() +
+  labs(title = "Proyección UMAP: Visualización Topológica de Películas",
+       subtitle = "Mapeo no lineal coloreado según los 4 perfiles comerciales (K-Medias)",
+       x = "UMAP Dimensión 1",
+       y = "UMAP Dimensión 2",
+       color = "Clúster") +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "right")
+
+print(grafica_umap)
+```
+# 4.2
+El mapa visual generado por el algoritmo UMAP confirma claramente que los cuatro grupos de películas descubiertos antes están bien separados en la realidad. Se observa un núcleo principal que agrupa al cine comercial exitoso, el cual está muy alejado de las producciones amateur o cortometrajes que aparecen dispersos por su gran variedad de formatos. Por otro lado, las películas épicas y el cine independiente de nicho forman sus propias islas totalmente aisladas del resto. Para CineVision Studios, este gráfico funciona como un radar de riesgo muy útil para predecir de forma visual a qué modelo de negocio pertenecerá cualquier nuevo proyecto.
