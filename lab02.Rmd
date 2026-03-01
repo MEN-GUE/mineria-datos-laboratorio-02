@@ -1046,6 +1046,38 @@ Con base en todos los descubrimientos realizados, se proponen las siguientes acc
 
 4. **Cambiar la distribución del cine independiente:** Las películas de bajo presupuesto y de nicho no deben gastar en publicidad masiva para cines. Su estrategia debe orientarse a festivales especializados y plataformas de streaming, donde las reglas de asociación muestran que tienen mejor recepción.
 
+
 5. **Explorar mercados internacionales:** El PC2 del PCA y las reglas de asociación filtradas (sin inglés) revelaron dinámicas específicas en mercados no angloparlantes. CineVision Studios podría diversificar su portafolio produciendo o distribuyendo contenido en idiomas con potencial comercial no explotado.
 
 6. **Depurar la base de datos:** Corregir los valores extremos detectados en `castMenAmount` y `productionCountriesAmount` para mejorar la calidad de futuros análisis predictivos.
+
+## Conclusión General
+
+Este proyecto demuestra que la integración de clustering, reducción de dimensionalidad y reglas de asociación permite transformar un dataset complejo en conocimiento estratégico accionable para la industria cinematográfica.
+
+El análisis confirmó que el mercado no es homogéneo, sino que se estructura en cuatro perfiles claramente diferenciados, cada uno con dinámicas propias de presupuesto, duración, popularidad y rentabilidad. La coherencia de estos grupos fue validada mediante el coeficiente de silueta, seleccionando K-Means como el algoritmo con mejor desempeño.
+
+El PCA permitió resumir eficientemente la información original en tres componentes principales que explican más del 60% de la variabilidad, identificando como eje dominante la escala global de producción (presupuesto, ingresos y volumen de votos). Por su parte, UMAP confirmó visualmente que los segmentos identificados operan bajo modelos de negocio estadísticamente distintos.
+
+* En el análisis de reglas de asociación se evidenció que:
+
+* La discretización fue esencial para aplicar Apriori correctamente.
+
+* El soporte controla la frecuencia mínima de aparición de patrones.
+
+* La confianza mide el poder predictivo de las reglas.
+
+* El lift permitió identificar asociaciones no triviales.
+
+* La eliminación de variables dominantes (como el idioma inglés) permitió descubrir patrones ocultos en mercados no angloparlantes.
+
+* Se confirmó una relación estructural fuerte entre altos presupuestos, altos ingresos y mayor visibilidad, mientras que las producciones de bajo presupuesto tienden a concentrarse en nichos con impacto comercial limitado.
+
+* Finalmente, se recomienda depurar variables con valores extremos (como castMenAmount y productionCountriesAmount) para mejorar la calidad de futuros modelos predictivos.
+
+En términos estratégicos, el verdadero valor de este análisis radica en su capacidad para clasificar proyectos futuros antes de invertir en ellos, permitiendo reducir riesgo, optimizar el portafolio y definir con claridad en qué modelo de negocio desea competir el estudio: volumen comercial, prestigio, nicho especializado o producción experimental.
+
+
+
+
+
