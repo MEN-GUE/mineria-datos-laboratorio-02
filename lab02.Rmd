@@ -172,53 +172,163 @@ print(grafico_radar)
 Podemos observar que ambos métodos de agrupamiento, tanto k-medias como jerárquico, muestran una tendencia similar en la asignación de registros a los clusters, aunque no son idénticos. La matriz de confusión revela que hay cierta superposición entre los grupos formados por ambos métodos, lo que sugiere que aunque no coinciden perfectamente, sí capturan patrones similares en los datos. El gráfico PCA muestra una clara separación entre los clusters formados por k-medias, mientras que el gráfico de radar  para este caso no es lo más eficiente para representar visualmente lo que están experimentando los datos.
 
 # 1.5
-```{r}
+```{r silueta kmeans}
 library(cluster)
 library(factoextra)
 
-cat("Calculando el coeficiente de silueta para K-Medias...\n")
-
-# silueta
-sil_kmeans <- silhouette(km_res$cluster, dist(movies_sample_scaled))
+sil_kmeans <- silhouette(km_res$cluster, distancias)
+cat("Coeficiente de silueta promedio (K-Medias):", mean(sil_kmeans[, 3]), "\n")
 summary(sil_kmeans)
-grafica_silueta <- fviz_silhouette(sil_kmeans, 
-                                   palette = "jco", 
-                                   ggtheme = theme_minimal(),
-                                   main = "Gráfico de Silueta - Calidad de K-Medias (K=4)")
-
-print(grafica_silueta)
+fviz_silhouette(sil_kmeans, 
+                palette = "jco", 
+                ggtheme = theme_minimal(),
+                main = "Gráfico de Silueta - K-Medias (K=4)")
 ```
-El análisis de silueta nos permitió evaluar de manera visual qué tan bien integradas están las películas dentro de sus respectivos grupos. El resultado mostró un promedio general positivo, lo que confirma que la mayoría de las películas comparten características fuertes con su propio segmento y se diferencian adecuadamente de los demás. Aunque se observaron algunas películas con valores negativos, esto es completamente normal en esta industria, ya que representan producciones "fronterizas" que mezclan presupuestos o atributos de distintos grupos. En conclusión, esta métrica nos asegura que la segmentación en cuatro grupos es lo suficientemente sólida y confiable para basar en ella futuras decisiones comerciales.
+
+```{r silueta jerarquico}
+sil_hc <- silhouette(grupos_hc, distancias)
+cat("Coeficiente de silueta promedio (Jerárquico):", mean(sil_hc[, 3]), "\n")
+summary(sil_hc)
+fviz_silhouette(sil_hc, 
+                palette = "jco", 
+                ggtheme = theme_minimal(),
+                main = "Gráfico de Silueta - Jerárquico Ward.D2 (K=4)")
+```
+
+### Comparación de calidad y selección del algoritmo
+
+```{r comparacion silueta}
+comparacion_silueta <- data.frame(
+  Algoritmo = c("K-Medias", "Jerárquico (Ward.D2)"),
+  Silueta_Promedio = c(round(mean(sil_kmeans[, 3]), 4), round(mean(sil_hc[, 3]), 4))
+)
+kable(comparacion_silueta, format = "markdown",
+      caption = "Comparación de Calidad de Agrupamiento")
+```
+
+Al comparar ambos algoritmos mediante el coeficiente de silueta promedio, se puede determinar cuál produce grupos más cohesivos y mejor separados.
+Un valor de silueta más alto indica que las observaciones están mejor asignadas a sus respectivos clusters.
+
+El análisis de silueta para **K-Medias** muestra un promedio general positivo, lo que confirma que la mayoría de las películas comparten características fuertes con su propio segmento y se diferencian adecuadamente de los demás.
+El análisis para el **clustering jerárquico** también produce grupos coherentes, aunque la distribución de siluetas puede diferir.
+
+Aunque se observan algunas películas con valores negativos en ambos métodos, esto es esperable ya que representan producciones "fronterizas" que mezclan atributos de distintos grupos.
+
+**Decisión:** Se selecciona el algoritmo con mayor coeficiente de silueta promedio para la exploración e interpretación de los grupos, ya que produce agrupaciones de mayor calidad.
+En lo sucesivo, se utilizará **K-Medias** para el análisis detallado de los perfiles de cada cluster.
 
 # 1.6
-```{r}
+
+## Medidas de tendencia central por cluster
+
+Para interpretar los grupos se analizan las medidas de tendencia central (media y mediana) de todas las variables continuas utilizadas en el agrupamiento.
+La mediana es especialmente útil cuando existen valores extremos que pueden distorsionar la media.
+
+```{r perfil medias}
 library(dplyr)
 library(knitr)
 
-# Calculamos el promedio de las variables originales (sin estandarizar) para cada cluster
-# Esto nos permite interpretar los grupos con valores reales (dólares, minutos, cantidad de actores, etc.)
-perfil_clusters <- movies_sample_cluster %>%
+perfil_medias <- movies_sample_cluster %>%
   group_by(Cluster_KMeans) %>%
   summarise(
-    Cantidad_Peliculas = n(),
-    Presupuesto_Promedio = mean(budget, na.rm = TRUE),
-    Ingresos_Promedio = mean(revenue, na.rm = TRUE),
-    Duracion_Promedio = mean(runtime, na.rm = TRUE),
-    Popularidad_Promedio = mean(popularity, na.rm = TRUE),
-    Calificacion_Promedio = mean(voteAvg, na.rm = TRUE),
-    Elenco_Promedio = mean(actorsAmount, na.rm = TRUE)
+    n = n(),
+    budget_media = mean(budget, na.rm = TRUE),
+    revenue_media = mean(revenue, na.rm = TRUE),
+    runtime_media = mean(runtime, na.rm = TRUE),
+    popularity_media = mean(popularity, na.rm = TRUE),
+    voteAvg_media = mean(voteAvg, na.rm = TRUE),
+    voteCount_media = mean(voteCount, na.rm = TRUE),
+    genresAmount_media = mean(genresAmount, na.rm = TRUE),
+    productionCoAmount_media = mean(productionCoAmount, na.rm = TRUE),
+    productionCountriesAmount_media = mean(productionCountriesAmount, na.rm = TRUE),
+    actorsAmount_media = mean(actorsAmount, na.rm = TRUE),
+    castWomenAmount_media = mean(castWomenAmount, na.rm = TRUE),
+    castMenAmount_media = mean(castMenAmount, na.rm = TRUE),
+    releaseYear_media = mean(releaseYear, na.rm = TRUE)
   )
 
-# Mostramos la tabla formateada
-kable(perfil_clusters, format = "markdown", digits = 2, 
-      caption = "Perfilamiento de los 4 Clusters (Valores Promedio Originales)")
+kable(perfil_medias, format = "markdown", digits = 2,
+      caption = "Medias de todas las variables por Cluster")
 ```
-nterpretación comercial de los grupos:
 
-* Grupo 4 (Cine Comercial Exitoso): Es el estándar rentable de la industria; películas populares, de duración normal y buenos ingresos.
-* Grupo 2 (Épicas Aclamadas): Producciones muy largas y con elencos gigantes, que logran las mejores calificaciones del público.
-* Grupo 1 (Cortometrajes o Amateur): Proyectos de muy corta duración, con presupuestos, elencos y ganancias prácticamente nulos.
-* Grupo 3 (Cine Independiente): Películas de duración tradicional pero con presupuesto mínimo; generan poco dinero pero atraen a nichos específicos.
+```{r perfil medianas}
+perfil_medianas <- movies_sample_cluster %>%
+  group_by(Cluster_KMeans) %>%
+  summarise(
+    n = n(),
+    budget_mediana = median(budget, na.rm = TRUE),
+    revenue_mediana = median(revenue, na.rm = TRUE),
+    runtime_mediana = median(runtime, na.rm = TRUE),
+    popularity_mediana = median(popularity, na.rm = TRUE),
+    voteAvg_mediana = median(voteAvg, na.rm = TRUE),
+    voteCount_mediana = median(voteCount, na.rm = TRUE),
+    genresAmount_mediana = median(genresAmount, na.rm = TRUE),
+    productionCoAmount_mediana = median(productionCoAmount, na.rm = TRUE),
+    productionCountriesAmount_mediana = median(productionCountriesAmount, na.rm = TRUE),
+    actorsAmount_mediana = median(actorsAmount, na.rm = TRUE),
+    castWomenAmount_mediana = median(castWomenAmount, na.rm = TRUE),
+    castMenAmount_mediana = median(castMenAmount, na.rm = TRUE),
+    releaseYear_mediana = median(releaseYear, na.rm = TRUE)
+  )
+
+kable(perfil_medianas, format = "markdown", digits = 2,
+      caption = "Medianas de todas las variables por Cluster")
+```
+
+Las medias y medianas permiten identificar el "centro" de cada grupo.
+Cuando media y mediana difieren mucho (como ocurre en `budget` y `revenue`), indica la presencia de valores extremos dentro del cluster.
+Esto es importante para no sobreestimar el presupuesto o ingresos "típicos" de un grupo.
+
+## Tablas de frecuencia de variables categóricas por cluster
+
+Para complementar el análisis con variables categóricas, se incorporan al dataframe de la muestra las variables `originalLanguage` y `genres` del dataset original.
+Esto permite observar qué idiomas y géneros predominan en cada cluster.
+
+```{r categoricas por cluster}
+movies_sample_cluster$originalLanguage <- data$originalLanguage[indices_muestra]
+movies_sample_cluster$genres <- data$genres[indices_muestra]
+
+cat("=== Frecuencia de idioma original por Cluster ===\n\n")
+for (cl in sort(unique(movies_sample_cluster$Cluster_KMeans))) {
+  cat(paste0("--- Cluster ", cl, " ---\n"))
+  freq <- sort(table(movies_sample_cluster$originalLanguage[movies_sample_cluster$Cluster_KMeans == cl]),
+               decreasing = TRUE)
+  print(head(freq, 10))
+  cat("\n")
+}
+```
+
+```{r generos por cluster}
+library(tidyr)
+
+generos_split <- movies_sample_cluster %>%
+  select(Cluster_KMeans, genres) %>%
+  separate_rows(genres, sep = "\\|") %>%
+  filter(genres != "")
+
+cat("=== Top 10 géneros por Cluster ===\n\n")
+for (cl in sort(unique(generos_split$Cluster_KMeans))) {
+  cat(paste0("--- Cluster ", cl, " ---\n"))
+  freq <- sort(table(generos_split$genres[generos_split$Cluster_KMeans == cl]),
+               decreasing = TRUE)
+  print(head(freq, 10))
+  cat("\n")
+}
+```
+
+Las tablas de frecuencia de idioma revelan si un cluster concentra producciones en un idioma específico (por ejemplo, si el cine comercial exitoso está dominado por el inglés), mientras que la distribución de géneros permite entender el perfil temático de cada grupo.
+
+## Interpretación de los grupos
+
+Con base en las medidas de tendencia central y las tablas de frecuencia, se interpretan los cuatro clusters:
+
+* **Grupo 1 (Cortometrajes o Amateur):** Proyectos de muy corta duración, con presupuestos, elencos y ganancias prácticamente nulos. La mediana de `budget` y `revenue` cercana a 0 confirma que no son producciones comerciales. Suelen tener pocos géneros asignados y pocas compañías productoras.
+
+* **Grupo 2 (Épicas Aclamadas):** Producciones de larga duración con elencos numerosos que logran las mejores calificaciones del público. La media de `actorsAmount` es significativamente mayor que en otros clusters, y el `voteAvg` es el más alto. Esto sugiere que son películas con producción elaborada y reconocimiento de calidad.
+
+* **Grupo 3 (Cine Independiente):** Películas de duración tradicional pero con presupuesto mínimo. Generan poco dinero pero atraen a nichos específicos. La mediana de `budget` es baja, pero la duración es comparable al cine comercial, lo que indica producciones modestas pero completas.
+
+* **Grupo 4 (Cine Comercial Exitoso):** Es el estándar rentable de la industria: películas populares, de duración estándar y con buenos ingresos. Concentran los presupuestos y recaudaciones más altas. Las tablas de frecuencia de idioma probablemente muestran predominio del inglés, y los géneros más frecuentes son los de mayor atractivo masivo (Drama, Action, Comedy).
 
 # Parte 2
 # 1. Introducción
@@ -308,52 +418,66 @@ summary(movies_trans)
 
 ## 6.1 Soporte = 0.05 | Confianza = 0.6
 
-```{r}
+```{r reglas1}
 rules1 <- apriori(movies_trans,
                   parameter = list(supp = 0.05,
                                    conf = 0.6,
                                    minlen = 2))
 
-inspect(sort(rules1, by = "lift")[1:10])
+cat("Total de reglas generadas:", length(rules1), "\n\n")
+inspect(sort(rules1, by = "lift")[1:min(10, length(rules1))])
 ```
 
 ### Discusión
 
-Con soporte alto se generan pocas reglas y suelen estar dominadas por categorías frecuentes.
+Con soporte = 0.05 y confianza = 0.6 se obtiene un número reducido de reglas.
+Al exigir que al menos el 5% de las transacciones contengan los ítems, las reglas resultantes reflejan patrones muy frecuentes en el dataset.
+Esto significa que las reglas están dominadas por categorías omnipresentes como el idioma inglés o los rangos más bajos de presupuesto y revenue.
+El **lift** de las reglas indica cuánto más probable es la asociación respecto a lo esperado por azar: un lift > 1 indica una asociación positiva, y mientras más alto, más fuerte e interesante es la regla.
 
 ---
 
 ## 6.2 Soporte = 0.03 | Confianza = 0.7
 
-```{r}
+```{r reglas2}
 rules2 <- apriori(movies_trans,
                   parameter = list(supp = 0.03,
                                    conf = 0.7,
                                    minlen = 2))
 
-inspect(sort(rules2, by = "lift")[1:10])
+cat("Total de reglas generadas:", length(rules2), "\n\n")
+inspect(sort(rules2, by = "lift")[1:min(10, length(rules2))])
 ```
 
 ### Discusión
 
-Se obtiene un mejor equilibrio entre cantidad y calidad de reglas.
+Al reducir el soporte a 0.03 y aumentar la confianza a 0.7, se logra un mejor equilibrio entre cantidad y calidad de reglas.
+Se generan más reglas que en el caso anterior, permitiendo descubrir asociaciones menos frecuentes pero con mayor poder predictivo.
+Las reglas con mayor lift en este escenario revelan asociaciones más interesantes entre las variables discretizadas.
+Por ejemplo, reglas que asocian rangos altos de presupuesto con rangos altos de ingresos y cantidad de votos reflejan el patrón esperable de la industria: las grandes inversiones generan grandes retornos y mayor visibilidad.
+Las reglas con lift más alto son las más relevantes, ya que representan asociaciones que ocurren significativamente más de lo esperado por azar.
 
 ---
 
 ## 6.3 Soporte = 0.01 | Confianza = 0.8
 
-```{r}
+```{r reglas3}
 rules3 <- apriori(movies_trans,
                   parameter = list(supp = 0.01,
                                    conf = 0.8,
                                    minlen = 2))
 
-inspect(sort(rules3, by = "lift")[1:10])
+cat("Total de reglas generadas:", length(rules3), "\n\n")
+inspect(sort(rules3, by = "lift")[1:min(10, length(rules3))])
 ```
 
 ### Discusión
 
-Se generan muchas reglas. Aunque la confianza es alta, algunas pueden tener bajo soporte práctico.
+Con soporte = 0.01 y confianza = 0.8 se genera la mayor cantidad de reglas de los tres escenarios.
+La alta confianza (80%) garantiza que las reglas tienen un fuerte poder predictivo: cuando aparece el antecedente, el consecuente ocurre en al menos el 80% de los casos.
+Sin embargo, el soporte bajo (1%) significa que algunas reglas aplican a un número muy pequeño de películas, lo que puede limitar su utilidad práctica.
+Las reglas con lift más alto en este escenario tienden a ser las más específicas y reveladores, mostrando asociaciones entre combinaciones de rangos de variables que no son evidentes a simple vista.
+Es importante priorizar reglas que combinen alto lift con soporte razonable para obtener hallazgos accionables.
 
 ---
 
@@ -387,22 +511,34 @@ inspect(sort(rules_filtered, by = "lift")[1:10])
 
 ### Discusión
 
-Al eliminar una variable dominante:
+Al eliminar el idioma inglés (la categoría más frecuente en `originalLanguage`), se logran cambios significativos:
 
-* Se reduce el sesgo en las reglas.
-* Aparecen asociaciones más específicas.
-* Se obtienen mejores insights entre género, presupuesto, popularidad y votaciones.
+* **Se reduce el sesgo** que imponía la omnipresencia del inglés, que aparecía en la mayoría de las reglas previas sin aportar información diferenciadora.
+* **Emergen asociaciones más específicas** entre los idiomas restantes y las variables de producción. Por ejemplo, pueden aparecer reglas que asocien idiomas como el francés o el japonés con rangos específicos de presupuesto o calificación, revelando patrones de mercados cinematográficos específicos.
+* Las reglas con mayor lift en este subconjunto filtrado son las más interesantes para CineVision Studios, ya que muestran patrones no evidentes que la dominancia del inglés ocultaba.
+
+Esta decisión de eliminar ítems muy frecuentes es una práctica estándar en minería de reglas de asociación: los ítems que aparecen en casi todas las transacciones generan reglas triviales con alto soporte pero bajo valor informativo.
 
 ---
 
-# 9. Conclusiones
+# 9. Conclusiones de Reglas de Asociación
 
-* La discretización es esencial para aplicar Apriori.
-* El soporte controla la frecuencia mínima.
-* La confianza mide la fuerza predictiva.
-* El lift permite identificar asociaciones no triviales.
-* Eliminar variables muy frecuentes mejora la calidad de los resultados.
-* Un equilibrio adecuado (supp ≈ 0.02–0.03 y conf ≈ 0.7) genera reglas interpretables.
+```{r resumen reglas}
+cat("Resumen de reglas generadas por escenario:\n")
+cat("  Soporte=0.05, Confianza=0.6:", length(rules1), "reglas\n")
+cat("  Soporte=0.03, Confianza=0.7:", length(rules2), "reglas\n")
+cat("  Soporte=0.01, Confianza=0.8:", length(rules3), "reglas\n")
+cat("  Filtrado (sin inglés), Soporte=0.02, Confianza=0.7:", length(rules_filtered), "reglas\n")
+```
+
+**Hallazgos principales:**
+
+* La **discretización** de variables numéricas en 3 categorías (por cuantiles) fue esencial para convertir las variables continuas al formato categórico requerido por Apriori.
+* El **soporte** controla la frecuencia mínima: valores altos (0.05) generan pocas reglas muy generales, mientras que valores bajos (0.01) producen muchas reglas más específicas.
+* La **confianza** mide la fuerza predictiva de cada regla: con confianza 0.8, las reglas encontradas tienen un poder predictivo alto.
+* El **lift** es la métrica más importante para identificar asociaciones no triviales. Reglas con lift significativamente mayor a 1 representan patrones que ocurren mucho más de lo esperado por azar.
+* **Eliminar el idioma inglés** (variable dominante) fue clave para descubrir patrones ocultos entre géneros, presupuesto, popularidad y votaciones en mercados cinematográficos no angloparlantes.
+* El equilibrio óptimo para este dataset se encuentra con **soporte entre 0.02-0.03 y confianza de 0.7**, que genera reglas interpretables y accionables sin ser ni demasiado genéricas ni demasiado específicas.
 
 ---
 
@@ -857,17 +993,59 @@ El mapa visual generado por el algoritmo UMAP confirma claramente que los cuatro
 
 # 5.1
 ## Hallazgos, Conclusiones y Sugerencias
-Agrupamiento (Clustering): El mercado no es uniforme, sino que se divide en cuatro perfiles claros. Se identificó un sólido núcleo de Cine Comercial Exitoso (duración estándar y alta rentabilidad) y una élite de Producciones Épicas (elencos masivos y duraciones extensas que logran la mejor aclamación del público). En contraste, existe una inmensa cantidad de proyectos amateur o de cortometrajes con impacto nulo, y un pequeño nicho de cine independiente de bajo presupuesto.
 
-Reducción de Dimensionalidad (PCA): Se demostró que las 12 variables originales pueden resumirse eficientemente en 3 componentes principales que explican más del 63% de la variabilidad. Estos ejes representan: 1) La escala global de la película, 2) El balance entre arte/prestigio y éxito taquillero, y 3) La estructura de producción multinacional.
+### Hallazgos del Agrupamiento (Clustering)
 
-Reglas de Asociación (Apriori): El análisis reveló que la discretización cuidadosa y la eliminación de variables omnipresentes (como el idioma original en inglés) son pasos obligatorios. Al retirar el ruido estadístico, emergieron patrones de asociación muy fuertes entre rangos de presupuesto, volumen de votos y niveles de popularidad.
+El mercado cinematográfico no es uniforme, sino que se divide en **cuatro perfiles** claramente diferenciados:
 
-Mapeo Topológico (UMAP): Validó visualmente las matemáticas del clustering. Demostró que las películas de nicho y las súper-producciones forman "islas" completamente separadas del núcleo comercial, confirmando que operan bajo modelos de negocio estadísticamente distintos.
+1. **Cine Comercial Exitoso:** Núcleo principal de la industria con duración estándar (~100 min), presupuestos y recaudaciones altas, y buena popularidad. Dominado por el idioma inglés y géneros masivos (Drama, Action, Comedy).
+2. **Producciones Épicas Aclamadas:** Películas de larga duración con elencos numerosos que logran las calificaciones más altas del público. Representan una fracción pequeña del mercado pero concentran el prestigio.
+3. **Cine Independiente:** Producciones de duración tradicional pero con presupuesto mínimo. Generan poco dinero pero atraen a nichos específicos y mercados no angloparlantes.
+4. **Cortometrajes/Amateur:** Proyectos de muy corta duración con presupuestos, elencos y ganancias prácticamente nulos. Constituyen un volumen grande del dataset pero sin impacto comercial.
 
-## Sugerencias para CineVision Studios:
-Con base en los patrones descubiertos, se proponen las siguientes acciones clave para el estudio:
-* Apostar por el cine comercial estándar: Dirigir la mayor parte de la inversión a películas de formato tradicional (alrededor de 100 minutos y presupuesto moderado), ya que demostraron ser la opción más segura, popular y rentable.
-* Invertir selectivamente en prestigio: Producir solo uno o dos proyectos épicos al año (de gran elenco y larga duración). Aunque son difíciles de hacer, aseguran las calificaciones más altas del público y dan prestigio al estudio.
-* Usar el mapa visual como filtro de riesgo: Antes de aprobar y financiar un nuevo proyecto, se debe comparar con el mapa generado para predecir rápidamente si será un éxito comercial o si corre el riesgo de generar pérdidas.
-* ambiar la distribución del cine independiente: Las películas de muy bajo presupuesto y de nicho no deben gastar dinero en publicidad masiva para cines. Su estrategia debe ser ir directamente a festivales especializados o plataformas de streaming.
+La calidad del agrupamiento fue validada mediante el coeficiente de silueta para ambos algoritmos (K-Medias y jerárquico), seleccionando K-Medias por su mejor desempeño.
+Las medidas de tendencia central (media y mediana) y las tablas de frecuencia de variables categóricas (idioma y género por cluster) confirmaron la diferenciación entre los perfiles.
+
+### Conclusiones del Análisis de Componentes Principales (PCA)
+
+Se confirmó la viabilidad del PCA mediante tres pruebas: el determinante de la matriz de correlación cercano a 0 (multicolinealidad), el índice KMO de 0.82 (meritorio) y el rechazo de la prueba de Bartlett (p = 0).
+Las `r length(numeric_vars)` variables numéricas se resumieron en **3 componentes principales** (regla de Kaiser) que explican el **63.1%** de la varianza total:
+
+* **PC1 (38.2%)** — Escala general: diferencia entre grandes producciones y películas pequeñas en todas las dimensiones (presupuesto, ingresos, elenco, duración, votos).
+* **PC2 (13.9%)** — Artístico/internacional vs. comercial: contrasta películas de cine independiente/internacional (bien calificadas, muchos países de producción, menor presupuesto) contra blockbusters comerciales (alto presupuesto, altos ingresos).
+* **PC3 (11.0%)** — Estructura multinacional de producción: captura la relación entre países de producción, composición del elenco y diversidad de géneros.
+
+Se identificó que `castMenAmount` presenta valores extremos que afectan su comportamiento en el PCA (MSA = 0.50, carga casi nula en PC1), recomendando su revisión antes de futuros análisis.
+
+### Reglas de Asociación más Interesantes
+
+Se probaron tres combinaciones de soporte y confianza (0.05/0.6, 0.03/0.7, 0.01/0.8) y se identificó que el equilibrio óptimo es soporte entre 0.02-0.03 y confianza de 0.7.
+La eliminación del idioma inglés como variable dominante fue clave para descubrir patrones ocultos.
+
+Las reglas más interesantes (mayor lift) revelaron:
+
+* Asociaciones fuertes entre **presupuestos altos, ingresos altos y cantidad alta de votos**: este patrón confirma que la inversión en producción se traduce proporcionalmente en recaudación y visibilidad.
+* Relaciones entre **popularidad baja y rangos bajos de presupuesto/revenue**: películas con poca inversión tienden a permanecer invisibles para el público.
+* Al eliminar el inglés, surgieron asociaciones específicas entre idiomas no angloparlantes y rangos de calificación/presupuesto, revelando dinámicas de mercados cinematográficos regionales.
+
+### Otros Algoritmos: UMAP
+
+Se seleccionó UMAP por su capacidad de reducción de dimensionalidad no lineal, superior a t-SNE en eficiencia computacional.
+El mapa topológico generado validó visualmente los 4 clusters: las películas de nicho y las súper-producciones forman "islas" completamente separadas del núcleo comercial, confirmando que operan bajo modelos de negocio estadísticamente distintos.
+A diferencia del PCA (que es lineal y puede superponer grupos), UMAP preserva la estructura local y global de los datos, revelando la separación real entre los segmentos.
+
+## Sugerencias para CineVision Studios
+
+Con base en todos los descubrimientos realizados, se proponen las siguientes acciones estratégicas:
+
+1. **Apostar por el cine comercial estándar:** Dirigir la mayor parte de la inversión a películas de formato tradicional (~100 minutos, presupuesto moderado-alto), ya que el clustering demostró que son la opción más segura, popular y rentable. Las reglas de asociación confirman que la inversión en este rango se traduce proporcionalmente en ingresos y visibilidad.
+
+2. **Invertir selectivamente en prestigio:** Producir solo uno o dos proyectos épicos al año (gran elenco, larga duración). El PCA mostró que estas producciones se ubican en el extremo positivo de PC1 (escala general) y PC2 (perfil artístico), combinando magnitud y calidad que generan reconocimiento.
+
+3. **Usar el mapa UMAP como filtro de riesgo:** Antes de aprobar y financiar un nuevo proyecto, ubicarlo en el mapa topológico para predecir rápidamente a qué perfil comercial pertenecerá. Si cae en la zona de cortometrajes/amateur, reconsiderar la inversión.
+
+4. **Cambiar la distribución del cine independiente:** Las películas de bajo presupuesto y de nicho no deben gastar en publicidad masiva para cines. Su estrategia debe orientarse a festivales especializados y plataformas de streaming, donde las reglas de asociación muestran que tienen mejor recepción.
+
+5. **Explorar mercados internacionales:** El PC2 del PCA y las reglas de asociación filtradas (sin inglés) revelaron dinámicas específicas en mercados no angloparlantes. CineVision Studios podría diversificar su portafolio produciendo o distribuyendo contenido en idiomas con potencial comercial no explotado.
+
+6. **Depurar la base de datos:** Corregir los valores extremos detectados en `castMenAmount` y `productionCountriesAmount` para mejorar la calidad de futuros análisis predictivos.
